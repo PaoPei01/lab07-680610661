@@ -5,7 +5,7 @@ import morgan from "morgan";
 
 // import database
 import { students } from '@db/db.js';
-import { type Student, type Course } from "@libs/types.js";
+import { type Student } from "@libs/types.js";
 import {
   zStudentDeleteBody,
   zStudentPostBody,
@@ -26,33 +26,44 @@ app.get("/", (req: Request, res: Response) => {
 
 // GET /students
 // get students (by program)
-app.get("/students", (req: Request, res: Response) => {
+const getStudents = (req: Request, res: Response) => {
   try {
-    const program = req.query.program;
+    const { program, studentId } = req.query;
+    let filteredStudents = students;
 
-    if (program) {
-      let filtered_students = students.filter(
+    if (studentId !== undefined) {
+      if (typeof studentId !== "string" || studentId.length !== 9) {
+        return res.status(400).json({
+          ok: false,
+          message: "Student Id must contain 9 characters",
+        });
+      }
+
+      filteredStudents = filteredStudents.filter(
+        (student) => student.studentId === studentId
+      );
+    }
+
+    if (program !== undefined) {
+      filteredStudents = filteredStudents.filter(
         (student) => student.program === program
       );
-      return res.json({
-        success: true,
-        data: filtered_students,
-      });
-    } else {
-      return res.json({
-        success: true,
-        count: students.length,
-        data: students,
-      });
     }
-  } catch (err) {
+
     return res.json({
-      success: false,
+      ok: true,
+      students: filteredStudents,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
       message: "Something is wrong, please try again",
       error: err,
     });
   }
-});
+};
+
+app.get(["/students", "/api/students"], getStudents);
 
 // POST /students, body = {new student data}
 // add a new student
@@ -149,13 +160,54 @@ app.put("/students", (req: Request, res: Response) => {
 });
 
 // DELETE /students, body = {studentId}
-app.delete("/students", (req: Request, res: Response) => {
-  res.json({
-    message: "Implement this!"
-  })
-});
+const deleteStudent = (req: Request, res: Response) => {
+  try {
+    const result = zStudentDeleteBody.safeParse(req.body);
+
+    if (!result.success) {
+      return res.status(400).json({
+        ok: false,
+        message: result.error.issues[0]?.message ?? "Validation failed",
+      });
+    }
+
+    const { studentId } = result.data;
+    const foundIndex = students.findIndex(
+      (student) => student.studentId === studentId
+    );
+
+    if (foundIndex === -1) {
+      return res.status(404).json({
+        ok: false,
+        message: "Student ID does not exist",
+      });
+    }
+
+    students.splice(foundIndex, 1);
+
+    return res.status(200).json({
+      ok: true,
+      message: `Student Id ${studentId} has been deleted`,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      message: "Something is wrong, please try again",
+      error: err,
+    });
+  }
+};
+
+app.delete(["/students", "/api/students"], deleteStudent);
 
 // GET /api/me
+app.get("/api/me", (_req: Request, res: Response) => {
+  return res.json({
+    ok: true,
+    fullName: "Jirapradit Thanapanyasakun",
+    studentId: "680610661",
+  });
+});
 
 app.listen(port, async () => {
   console.log(`🚀 Server running on http://localhost:${port}`);

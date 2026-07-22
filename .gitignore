@@ -3,4 +3,5 @@
 dist
 logs
 node_modules/
+.pnpm-store/
 migration/
